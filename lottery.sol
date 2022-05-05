@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // An example of a consumer contract that relies on a subscription for funding.
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.7;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
@@ -58,8 +58,9 @@ contract Lottery is VRFConsumerBaseV2 {
 
   function startLottery() public onlyOwner{
       require(lotteryState == LOTTERY_STATE.CLOSED, "Can't start a new lottery");
+      players = new address payable[](0);//didn't work try set up globally and test again
       lotteryState = LOTTERY_STATE.OPEN;
-      s_randomWords = new uint[](0);
+      s_randomWords = new uint[](0);//didn't work
     }
 
   function participate() public payable{
@@ -104,22 +105,25 @@ contract Lottery is VRFConsumerBaseV2 {
               callbackGasLimit,
               numWords
              );
-         emit RequestedRandomness(s_requestId);
+        emit RequestedRandomness(s_requestId);
         }
 
-  
+
   function fulfillRandomWords(
     uint256, /* requestId */
     uint256[] memory randomWords
   ) internal override {
-    s_randomWords = randomWords;
-    require(randomWords[0] > 0, "random number not found");
-    uint index = randomWords[0] % players.length;
-    players[index].transfer(address(this).balance);
-    recentWinner = players[index];
-    players = new address payable[](0);
-    lotteryState = LOTTERY_STATE.CLOSED;
+    resetLottery(randomWords);
   }
+  
+  function resetLottery (uint256[] memory random) private {
+    s_randomWords = random;
+    require(s_randomWords[0] > 0, "random number not found");
+    uint index = s_randomWords[0] % players.length;
+    //recentWinner = players[index];//PROBLEM IS HERE. SENDING MONEY TO ADDREESS 0;players[index] doesnt work
+    lotteryState = LOTTERY_STATE.CLOSED;
+    players[index].transfer(address(this).balance);
+  } 
 
   modifier onlyOwner() {
     require(msg.sender == s_owner);
